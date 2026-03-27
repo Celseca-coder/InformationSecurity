@@ -47,10 +47,76 @@ Playfair 密码是一种基于 5×5 字母矩阵的双字母替换密码。使�
 ### 5.1 playfairDecipher 实现
 
 <!-- TODO: 描述解密函数的设计思路与关键代码 -->
+```c
+char *playfairDecipher(char *key, char *text, char *result, int len) {
+    int i, a, b, r1, c1, r2, c2;
+    for (i = 0; i < len; i += 2) {
+        // 找到两个字符在 5x5 矩阵中的位置
+        a = strchr(key, text[i]) - key;
+        b = strchr(key, text[i + 1]) - key;
+        r1 = a / 5; c1 = a % 5;
+        r2 = b / 5; c2 = b % 5;
+
+        if (r1 == r2) { // 同一行：向左循环移位
+            result[i] = key[r1 * 5 + (c1 + 4) % 5];
+            result[i + 1] = key[r2 * 5 + (c2 + 4) % 5];
+        } else if (c1 == c2) { // 同一列：向上循环移位
+            result[i] = key[((r1 + 4) % 5) * 5 + c1];
+            result[i + 1] = key[((r2 + 4) % 5) * 5 + c2];
+        } else { // 矩形对角
+            result[i] = key[r1 * 5 + c2];
+            result[i + 1] = key[r2 * 5 + c1];
+        }
+    }
+    result[len] = '\0';
+    return result;
+}
+```
 
 ### 5.2 playfairCrack 实现
 
 <!-- TODO: 描述模拟退火函数的设计思路与关键代码 -->
+```c
+float playfairCrack(char *text, int len, char *bestKey) {
+    char *deciphered = malloc(sizeof(char) * (len + 1));
+    char currentKey[26], nextKey[26];
+    float currentScore, nextScore, maxScore;
+    float T;
+    int count;
+
+    // 初始化：随机打乱当前密钥作为起点
+    strcpy(currentKey, bestKey);
+    shuffleKey(currentKey);
+    
+    playfairDecipher(currentKey, text, deciphered, len);
+    currentScore = scoreTextQgram(deciphered, len);
+    maxScore = currentScore;
+
+    // 模拟退火主循环
+    for (T = TEMP; T >= 0; T -= STEP) {
+        for (count = 0; count < COUNT; count++) {
+            modifyKey(nextKey, currentKey);
+            playfairDecipher(nextKey, text, deciphered, len);
+            nextScore = scoreTextQgram(deciphered, len);
+            
+            float dE = nextScore - currentScore;
+            // 如果新密钥更好，或者在概率范围内允许变差
+            if (dE > 0 || exp(dE / T) > (float)rand() / RAND_MAX) {
+                currentScore = nextScore;
+                strcpy(currentKey, nextKey);
+
+                if (currentScore > maxScore) {
+                    maxScore = currentScore;
+                    strcpy(bestKey, currentKey);
+                }
+            }
+        }
+    }
+
+    free(deciphered);
+    return maxScore;
+}
+```
 
 ## 6 实验结果
 
